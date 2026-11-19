@@ -1,0 +1,20 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-11-19
+
+### Added
+
+- `taugraph-mcp` CLI: serve taugraph flow modules (TypeScript or JavaScript) over stdio or Streamable HTTP. Flow files can import `taugraph`, `taugraph/nodes`, `taugraph-mcp` and `zod` without a local install.
+- Per flow, a `<flow>` tool (input schema from zod, structured output) and a `<flow>_resume` tool; plus `taugraph_runs`.
+- Pauses are asked through MCP elicitation when the client supports it, otherwise returned to the agent.
+- LLM nodes use `TAUGRAPH_BASE_URL` / `TAUGRAPH_MODEL`, or the client's model through MCP sampling.
+- File store: one append-only JSONL trace per run, written before each next step. Interrupted writes are reported and never retried; interrupted read steps resume.
+- Library API: `defineFlow`, `createFlowServer`, `serveHttp`, `loadFlows`, `fileStore`, `memoryStore`, `samplingModel`, `openAICompatibleModel`.
+- Example flows and an AgentScope Java 2.0.5 client example, checked in CI.
+
+[Unreleased]: https://github.com/wangcao-hub/taugraph-mcp/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/wangcao-hub/taugraph-mcp/releases/tag/v0.1.0

@@ -1,0 +1,76 @@
+{
+  "name": "taugraph-mcp",
+  "version": "0.1.0",
+  "description": "Serve taugraph flows as MCP tools: deterministic multi-step flows with pauses, typed state and replayable traces for any MCP client (Claude, Cursor, Kiro, AgentScope Java, ...).",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "taugraph",
+    "agent",
+    "workflow",
+    "deterministic",
+    "human-in-the-loop",
+    "elicitation",
+    "agentscope"
+  ],
+  "license": "MIT",
+  "author": "wangcao-hub (https://github.com/wangcao-hub)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wangcao-hub/taugraph-mcp.git"
+  },
+  "homepage": "https://github.com/wangcao-hub/taugraph-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/wangcao-hub/taugraph-mcp/issues"
+  },
+  "type": "module",
+  "bin": {
+    "taugraph-mcp": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "examples",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').chmodSync('dist/cli.js',0o755)\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "pnpm build && vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "prepublishOnly": "pnpm check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32",
+    "jiti": "^2",
+    "taugraph": "^0.2.0",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2",
+    "@types/node": "^24",
+    "typescript": "^5.9",
+    "vitest": "^5"
+  }
+}
