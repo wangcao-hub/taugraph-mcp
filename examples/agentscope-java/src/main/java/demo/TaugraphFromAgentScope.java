@@ -11,8 +11,8 @@ import java.util.TreeSet;
 /**
  * AgentScope Java calling taugraph-mcp over stdio: headless resume, elicitation, and Toolkit registration.
  *
- * <p>Run from this directory: {@code mvn -q compile exec:java -Dexec.args="npx -y taugraph-mcp ../flows"}.
- * The arguments are the command that starts taugraph-mcp; this example adds {@code --store} itself.
+ * <p>The program arguments are the command that starts taugraph-mcp; this example adds {@code --store}
+ * itself. See README.md in this directory for how to run it.
  */
 public class TaugraphFromAgentScope {
     public static void main(String[] args) {
