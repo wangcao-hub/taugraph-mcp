@@ -50,10 +50,31 @@ describe("samplingModel", () => {
     ]);
   });
 
-  it("needs resolveImage for image references", async () => {
+  it("sends a single part as one block", async () => {
+    const seen: { params?: { messages?: unknown[] } } = {};
+    await samplingModel(samplingServer(seen)).complete(
+      {
+        messages: [
+          { role: "user", content: [{ type: "text", text: "hi" }] },
+          { role: "user", content: [{ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" }] },
+        ],
+      },
+      { signal },
+    );
+    expect(seen.params?.messages).toEqual([
+      { role: "user", content: { type: "text", text: "hi" } },
+      { role: "user", content: { type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" } },
+    ]);
+  });
+
+  it("needs resolveImage for image references, and base64 from it", async () => {
     await expect(
       samplingModel(samplingServer()).complete({ messages: [{ role: "user", content: photo }] }, { signal }),
-    ).rejects.toThrow(/no resolver for image URL "media:a"/);
+    ).rejects.toThrow('Image "media:a" needs resolveImage to be read');
+    const toURL = samplingModel(samplingServer(), { resolveImage: () => ({ type: "image", url: "media:b" }) });
+    await expect(toURL.complete({ messages: [{ role: "user", content: photo }] }, { signal })).rejects.toThrow(
+      'MCP sampling takes images as base64 only, but got the URL "media:b"; make resolveImage return { data, mimeType }',
+    );
   });
 });
 
@@ -79,6 +100,16 @@ describe("openAICompatibleModel", () => {
       },
     ]);
     const plain = openAICompatibleModel({ baseURL: "http://x/v1", model: "m" });
-    await expect(plain.complete({ messages: [{ role: "user", content }] }, { signal })).rejects.toThrow(/media:a/);
+    await expect(plain.complete({ messages: [{ role: "user", content }] }, { signal })).rejects.toThrow(
+      'Image "media:a" needs resolveImage to be read',
+    );
+    const toURL = openAICompatibleModel({
+      baseURL: "http://x/v1",
+      model: "m",
+      resolveImage: () => ({ type: "image", url: "media:b" }),
+    });
+    await expect(toURL.complete({ messages: [{ role: "user", content }] }, { signal })).rejects.toThrow(
+      'Image "media:b" cannot be sent as a URL; make resolveImage return { data, mimeType } or an http(s) URL',
+    );
   });
 });

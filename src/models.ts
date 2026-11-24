@@ -12,16 +12,23 @@ import {
 
 const shown = (url: string): string => (url.length > 100 ? `${url.slice(0, 100)}…` : url);
 
+const needsResolver = (url: string): never => {
+  throw new TypeError(`Image "${shown(url)}" needs resolveImage to be read`);
+};
+
 type SamplingBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 
-/** MCP sampling content: one text block for plain text, otherwise text and image blocks in order. */
+/** MCP sampling content: one block alone (plain text or a single part), otherwise text and image blocks in order. */
 function toSamplingContent(content: MessageContent): SamplingBlock | SamplingBlock[] {
   if (typeof content === "string") return { type: "text", text: content };
-  return content.map((part): SamplingBlock => {
+  const blocks = content.map((part): SamplingBlock => {
     if (part.type === "text") return { type: "text", text: part.text };
     if ("data" in part) return { type: "image", data: part.data, mimeType: part.mimeType };
-    throw new TypeError(`MCP sampling needs image bytes, but got the URL "${shown(part.url)}"; pass resolveImage`);
+    throw new TypeError(
+      `MCP sampling takes images as base64 only, but got the URL "${shown(part.url)}"; make resolveImage return { data, mimeType }`,
+    );
   });
+  return blocks.length === 1 ? (blocks[0] as SamplingBlock) : blocks;
 }
 
 /**
@@ -41,7 +48,7 @@ export function samplingModel(
           "This flow needs a model, but the MCP client does not support sampling. Start taugraph-mcp with TAUGRAPH_BASE_URL and TAUGRAPH_MODEL set.",
         );
       }
-      const messages = await resolveImages(request.messages, options.resolveImage);
+      const messages = await resolveImages(request.messages, options.resolveImage ?? needsResolver);
       const systemPrompt = messages
         .filter((m) => m.role === "system")
         .map((m) => m.content)
@@ -80,10 +87,18 @@ export interface OpenAICompatibleOptions {
   readonly resolveImage?: ImageResolver;
 }
 
+/** URLs OpenAI takes as they are. */
+const SENDABLE = /^(https?|data):/i;
+
 function toOpenAIPart(part: ContentPart): Record<string, unknown> {
   if (part.type === "text") return { type: "text", text: part.text };
-  const url = "data" in part ? `data:${part.mimeType};base64,${part.data}` : part.url;
-  return { type: "image_url", image_url: { url } };
+  if ("data" in part) return { type: "image_url", image_url: { url: `data:${part.mimeType};base64,${part.data}` } };
+  if (!SENDABLE.test(part.url)) {
+    throw new TypeError(
+      `Image "${shown(part.url)}" cannot be sent as a URL; make resolveImage return { data, mimeType } or an http(s) URL`,
+    );
+  }
+  return { type: "image_url", image_url: { url: part.url } };
 }
 
 /** Any OpenAI-compatible `/chat/completions` endpoint: OpenAI, Ollama, vLLM, DeepSeek, Qwen, ... */
