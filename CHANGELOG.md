@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Images: `samplingModel` sends user messages with text and image parts as MCP content blocks, and `openAICompatibleModel` sends them in OpenAI's format. Both take `resolveImage` to read image references. Requires taugraph 0.3.0.
+
 ## [0.1.0] - 2026-11-19
 
 ### Added
