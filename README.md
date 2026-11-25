@@ -14,7 +14,7 @@ npx -y taugraph-mcp ./flows
 
 ## Write a flow
 
-A flow file default-exports `defineFlow({...})`. It can import `taugraph`, `taugraph/nodes`, `taugraph-mcp` and `zod` without installing them; the server provides its own copies.
+A flow file default-exports `defineFlow({...})`. It can import `taugraph`, `taugraph/nodes`, `taugraph/agent`, `taugraph/openai`, `taugraph-mcp` and `zod` without installing them; the server provides its own copies.
 
 ```ts
 // flows/deploy.ts
@@ -123,7 +123,7 @@ LLM nodes get `env.model`, which is, in order:
 
 If neither is available, the LLM step fails with a message that says how to configure one.
 
-The env model sends a request's `reasoning` level as `reasoning_effort` as it is (`"off"` as `"none"`). `reasoningParams`, which maps levels to other request parameters, is only available when you build `openAICompatibleModel` yourself. `samplingModel` ignores `reasoning`, because MCP sampling has no such field.
+The env model sends a request's `reasoning` level as `reasoning_effort` as it is (`"off"` as `"none"`), and sends the model's own reasoning back as `reasoning_content`. Endpoints that refuse that field, such as Groq and Cerebras, need an `openAICompatibleModel({ ..., sendReasoning: false })` that you build yourself. `reasoningParams`, which maps levels to other request parameters, is only available when you build `openAICompatibleModel` yourself. `samplingModel` ignores `reasoning`, because MCP sampling has no such field.
 
 Tool calling works with both models. `samplingModel` needs a client that declares `sampling.tools` (MCP 2025-11-25) and refuses tools otherwise; a `toolChoice` of one tool is sent as that tool alone, required. `openAICompatibleModel` is `taugraph/openai`'s adapter, so it takes all of that adapter's options.
 

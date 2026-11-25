@@ -12,7 +12,7 @@ npx -y taugraph-mcp ./flows
 
 ## 写一个流程
 
-流程文件默认导出 `defineFlow({...})`。文件里可以直接 import `taugraph`、`taugraph/nodes`、`taugraph-mcp` 和 `zod`，不用另外安装，服务端会提供自己的那一份。完整示例见 [English README](./README.md#write-a-flow) 和 [`examples/flows`](./examples/flows)。LLM 步骤把 `env.model` 传给 `LLMNode` 即可。
+流程文件默认导出 `defineFlow({...})`。文件里可以直接 import `taugraph`、`taugraph/nodes`、`taugraph/agent`、`taugraph/openai`、`taugraph-mcp` 和 `zod`，不用另外安装，服务端会提供自己的那一份。完整示例见 [English README](./README.md#write-a-flow) 和 [`examples/flows`](./examples/flows)。LLM 步骤把 `env.model` 传给 `LLMNode` 即可。
 
 ## 工具
 
@@ -76,7 +76,7 @@ LLM 节点拿到的 `env.model` 按以下顺序确定：
 
 两者都没有时，LLM 步骤会失败，并提示如何配置。
 
-用环境变量配置的模型把请求的 `reasoning` 档位原样作为 `reasoning_effort` 发出（`"off"` 写成 `"none"`）。`reasoningParams` 可以把档位换成别的请求参数，但只有自己构建 `openAICompatibleModel` 时才能用。`samplingModel` 忽略 `reasoning`，因为 MCP sampling 没有这个字段。
+用环境变量配置的模型把请求的 `reasoning` 档位原样作为 `reasoning_effort` 发出（`"off"` 写成 `"none"`），并把模型自己的思考作为 `reasoning_content` 发回。不接受这个字段的接口（如 Groq 和 Cerebras）需要自己构建 `openAICompatibleModel({ ..., sendReasoning: false })`。`reasoningParams` 可以把档位换成别的请求参数，但只有自己构建 `openAICompatibleModel` 时才能用。`samplingModel` 忽略 `reasoning`，因为 MCP sampling 没有这个字段。
 
 两种模型都支持工具调用。`samplingModel` 要求客户端声明 `sampling.tools`（MCP 2025-11-25），否则遇到工具会报错；指定单个工具的 `toolChoice` 会变成只发送这一个工具并要求调用。`openAICompatibleModel` 就是 `taugraph/openai` 的适配器，接受它的全部选项。
 

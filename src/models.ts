@@ -77,7 +77,10 @@ const usesTools = (request: LLMRequest): boolean =>
   (request.tools?.length ?? 0) > 0 ||
   request.messages.some((m) => m.role === "tool" || (m.role === "assistant" && (m.toolCalls?.length ?? 0) > 0));
 
-/** Tools and tool choice for MCP sampling. A choice of one tool becomes that tool alone, required. */
+/**
+ * Tools and tool choice for MCP sampling. A choice of one tool becomes that tool alone, required. Without tools,
+ * `"auto"` and `"none"` send no tool choice, so clients without `sampling.tools` take the request.
+ */
 function samplingTools(request: LLMRequest): Record<string, unknown> {
   const tools = (request.tools ?? []).map((t) => ({
     name: t.name,
@@ -85,12 +88,17 @@ function samplingTools(request: LLMRequest): Record<string, unknown> {
     inputSchema: t.inputSchema,
   }));
   const choice = request.toolChoice;
-  if (choice === undefined) return tools.length > 0 ? { tools } : {};
-  if (typeof choice === "string") return { ...(tools.length > 0 && { tools }), toolChoice: { mode: choice } };
-  const only = tools.filter((t) => t.name === choice.name);
-  if (only.length === 0)
-    throw new TypeError(`toolChoice names "${choice.name}", which is not one of the request's tools`);
-  return { tools: only, toolChoice: { mode: "required" } };
+  if (typeof choice === "object") {
+    const only = tools.filter((t) => t.name === choice.name);
+    if (only.length === 0)
+      throw new TypeError(`toolChoice names "${choice.name}", which is not one of the request's tools`);
+    return { tools: only, toolChoice: { mode: "required" } };
+  }
+  if (tools.length === 0) {
+    if (choice === "required") throw new TypeError('toolChoice "required" needs tools in the request');
+    return {};
+  }
+  return { tools, ...(choice !== undefined && { toolChoice: { mode: choice } }) };
 }
 
 /**

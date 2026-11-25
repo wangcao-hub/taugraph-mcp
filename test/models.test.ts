@@ -40,9 +40,12 @@ function toolServer(replies: unknown[], seen: Params[] = [], tools = true): Serv
 }
 
 /** A real MCP server and client over an in-memory transport; the client answers sampling with the given replies. */
-async function samplingPair(replies: unknown[], seen: Params[]): Promise<Server> {
+async function samplingPair(replies: unknown[], seen: Params[], tools = true): Promise<Server> {
   const server = new Server({ name: "test", version: "0.0.0" }, { capabilities: {} });
-  const client = new Client({ name: "client", version: "0.0.0" }, { capabilities: { sampling: { tools: {} } } });
+  const client = new Client(
+    { name: "client", version: "0.0.0" },
+    { capabilities: { sampling: tools ? { tools: {} } : {} } },
+  );
   client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
     seen.push(request.params as Params);
     return replies.shift() as never;
@@ -158,6 +161,24 @@ describe("samplingModel", () => {
     await expect(ask({ name: "zzz" })).rejects.toThrow(
       'toolChoice names "zzz", which is not one of the request\'s tools',
     );
+  });
+
+  it('sends no tool choice without tools, and refuses "required" without tools', async () => {
+    const seen: Params[] = [];
+    const model = samplingModel(await samplingPair([text("a"), text("b")], seen, false));
+    const ask = (toolChoice: "auto" | "none" | "required") =>
+      model.complete({ messages: [{ role: "user", content: "q" }], toolChoice }, { signal });
+    expect((await ask("none")).content).toBe("a");
+    expect((await ask("auto")).content).toBe("b");
+    expect(seen).toHaveLength(2);
+    for (const params of seen) {
+      expect(params).not.toHaveProperty("toolChoice");
+      expect(params).not.toHaveProperty("tools");
+    }
+    const required = ask("required");
+    await expect(required).rejects.toThrow(TypeError);
+    await expect(required).rejects.toThrow('toolChoice "required" needs tools in the request');
+    expect(seen).toHaveLength(2);
   });
 
   it("sends tool calls as tool_use blocks and consecutive results as one message of tool_result blocks", async () => {
