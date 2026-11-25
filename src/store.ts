@@ -1,6 +1,7 @@
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { fromJSONL, type Trace, type TraceEvent } from "taugraph";
+import { runStatus, type Trace, type TraceEvent } from "taugraph";
+import { type FileStore, fileStore as runFiles } from "taugraph/file";
 
 /**
  * Where runs live between tool calls. `append` is called for every event before the run
@@ -19,20 +20,25 @@ export function assertRunId(runId: string): void {
   if (!RUN_ID.test(runId)) throw new Error(`Invalid runId "${runId.slice(0, 40)}"`);
 }
 
-/** One append-only JSONL file per run: `<dir>/<flow>/<runId>.jsonl`. Survives process restarts. */
+/** One append-only JSONL file per run: `<dir>/<flow>/<runId>.jsonl`, through `taugraph/file`. Survives restarts and crashes. */
 export function fileStore(dir: string): RunStore {
-  const file = (flow: string, runId: string) => {
-    assertRunId(runId);
-    return join(dir, flow, `${runId}.jsonl`);
+  const stores = new Map<string, FileStore>();
+  const forFlow = (flow: string): FileStore => {
+    let store = stores.get(flow);
+    if (!store) {
+      store = runFiles(join(dir, flow));
+      stores.set(flow, store);
+    }
+    return store;
   };
   return {
     append(flow, event) {
-      mkdirSync(join(dir, flow), { recursive: true });
-      appendFileSync(file(flow, event.runId), `${JSON.stringify(event)}\n`);
+      assertRunId(event.runId);
+      forFlow(flow).sink(event);
     },
     load(flow, runId) {
-      const path = file(flow, runId);
-      return existsSync(path) ? fromJSONL(readFileSync(path, "utf8")) : undefined;
+      assertRunId(runId);
+      return forFlow(flow).load(runId);
     },
     list() {
       if (!existsSync(dir)) return [];
@@ -70,10 +76,7 @@ export type RunState = "running" | "paused" | "completed" | "failed" | "interrup
 
 /** `interrupted`: the trace ends without `run_end`, e.g. the server died mid-step. */
 export function runState(trace: Trace): RunState {
-  const last = trace[trace.length - 1];
-  if (last?.type === "run_end") {
-    const status = last.meta?.status;
-    return status === "paused" || status === "completed" || status === "failed" ? status : "failed";
-  }
-  return last?.type === "pause" ? "paused" : "interrupted";
+  const status = runStatus(trace);
+  if (status !== "running") return status;
+  return trace[trace.length - 1]?.type === "pause" ? "paused" : "interrupted";
 }

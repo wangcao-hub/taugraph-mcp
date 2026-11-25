@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- `fileStore` now stores runs through `taugraph/file`: trace format v2 (much smaller files), a half-written last line after a crash no longer breaks loading or resuming, a lock file per run, and fsync around write steps. Existing v1 files are still read.
+
 ## [0.2.0] - 2026-11-25
 
 Tool calling through MCP sampling, images and reasoning, and `openAICompatibleModel` on top of `taugraph/openai`; flow files can use `taugraph/agent`.

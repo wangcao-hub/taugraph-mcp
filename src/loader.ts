@@ -8,9 +8,10 @@ const EXTENSIONS = new Set([".ts", ".mts", ".js", ".mjs"]);
 
 /**
  * Flow files import `taugraph`, `taugraph/nodes`, `taugraph/agent`, `taugraph/openai`,
- * `taugraph-mcp` and `zod`. These resolve to the server's own copies, so `npx taugraph-mcp ./flows`
- * works without a local install and every flow shares one instance of each (one TaugraphError
- * class, one zod).
+ * `taugraph/file`, `taugraph-mcp` and `zod`. These resolve to the server's own copies, so
+ * `npx taugraph-mcp ./flows` works without a local install and every flow shares one instance of
+ * each (one TaugraphError class, one zod). Every subpath needs its own entry: `taugraph` alone
+ * would turn `taugraph/file` (imported by `taugraph-mcp` itself) into `<taugraph>/index.js/file`.
  */
 function aliases(): Record<string, string> {
   const own = (spec: string) => fileURLToPath(import.meta.resolve(spec));
@@ -19,6 +20,7 @@ function aliases(): Record<string, string> {
     "taugraph/nodes": own("taugraph/nodes"),
     "taugraph/agent": own("taugraph/agent"),
     "taugraph/openai": own("taugraph/openai"),
+    "taugraph/file": own("taugraph/file"),
     taugraph: own("taugraph"),
     "zod/v4": own("zod/v4"),
     zod: own("zod"),
