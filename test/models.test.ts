@@ -76,6 +76,16 @@ describe("samplingModel", () => {
       'MCP sampling takes images as base64 only, but got the URL "media:b"; make resolveImage return { data, mimeType }',
     );
   });
+
+  it("works with a reasoning level, which MCP sampling has no field for", async () => {
+    const seen: { params?: { messages?: unknown[] } } = {};
+    const reply = await samplingModel(samplingServer(seen)).complete(
+      { messages: [{ role: "user", content: "hi" }], reasoning: "high" },
+      { signal },
+    );
+    expect(reply.content).toBe("a cat");
+    expect(seen.params).not.toHaveProperty("reasoning");
+  });
 });
 
 describe("openAICompatibleModel", () => {
@@ -111,5 +121,42 @@ describe("openAICompatibleModel", () => {
     await expect(toURL.complete({ messages: [{ role: "user", content }] }, { signal })).rejects.toThrow(
       'Image "media:b" cannot be sent as a URL; make resolveImage return { data, mimeType } or an http(s) URL',
     );
+  });
+
+  it("asks for a reasoning level, reads what the model thought, and sends only OpenAI's fields", async () => {
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return Response.json({
+        choices: [{ message: { content: "ok", reasoning_content: "hmm" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 4, completion_tokens_details: { reasoning_tokens: 3 } },
+      });
+    });
+    const model = openAICompatibleModel({ baseURL: "http://x/v1", model: "m" });
+    const reply = await model.complete(
+      {
+        messages: [
+          { role: "user", content: "q" },
+          { role: "assistant", content: "a", model: "x", reasoning: [{ text: "r" }] },
+        ],
+        reasoning: "off",
+      },
+      { signal },
+    );
+    expect(body.reasoning_effort).toBe("none");
+    expect(body.messages).toEqual([
+      { role: "user", content: "q" },
+      { role: "assistant", content: "a" },
+    ]);
+    expect(reply.reasoning).toEqual([{ text: "hmm" }]);
+    expect(reply.usage).toEqual({ inputTokens: 1, outputTokens: 4, reasoningTokens: 3 });
+    const custom = openAICompatibleModel({
+      baseURL: "http://x/v1",
+      model: "m",
+      reasoningParams: () => ({ chat_template_kwargs: { enable_thinking: false } }),
+    });
+    await custom.complete({ messages: [{ role: "user", content: "q" }], reasoning: "off" }, { signal });
+    expect(body).not.toHaveProperty("reasoning_effort");
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
   });
 });

@@ -7,6 +7,7 @@ import {
   type LLMModel,
   type LLMRequest,
   type MessageContent,
+  type ReasoningLevel,
   resolveImages,
 } from "taugraph/nodes";
 
@@ -35,6 +36,7 @@ function toSamplingContent(content: MessageContent): SamplingBlock | SamplingBlo
  * Uses the client's model through MCP sampling (`sampling/createMessage`). The client decides
  * which model runs and may ask the user first. Fails clearly if the client does not support it.
  * `resolveImage` reads image references into base64.
+ * MCP sampling has no reasoning setting, so `request.reasoning` is not sent.
  */
 export function samplingModel(
   server: Server,
@@ -85,6 +87,8 @@ export interface OpenAICompatibleOptions {
   readonly apiKey?: string;
   /** Reads image URLs other than http(s) and data:, e.g. `media:abc` from your store. */
   readonly resolveImage?: ImageResolver;
+  /** Request parameters for a reasoning level. Default: `{ reasoning_effort }`, with "off" sent as "none". */
+  readonly reasoningParams?: (level: ReasoningLevel) => Record<string, unknown>;
 }
 
 /** URLs OpenAI takes as they are. */
@@ -101,6 +105,10 @@ function toOpenAIPart(part: ContentPart): Record<string, unknown> {
   return { type: "image_url", image_url: { url: part.url } };
 }
 
+const defaultReasoningParams = (level: ReasoningLevel): Record<string, unknown> => ({
+  reasoning_effort: level === "off" ? "none" : level,
+});
+
 /** Any OpenAI-compatible `/chat/completions` endpoint: OpenAI, Ollama, vLLM, DeepSeek, Qwen, ... */
 export function openAICompatibleModel(options: OpenAICompatibleOptions): LLMModel {
   const url = `${options.baseURL.replace(/\/+$/, "")}/chat/completions`;
@@ -112,9 +120,14 @@ export function openAICompatibleModel(options: OpenAICompatibleOptions): LLMMode
   return {
     id: `openai-compatible:${options.model}`,
     async complete(request, { signal }) {
-      const messages = (await resolveImages(request.messages, readImage)).map((m) =>
-        m.role === "user" && typeof m.content !== "string" ? { role: "user", content: m.content.map(toOpenAIPart) } : m,
-      );
+      const messages = (await resolveImages(request.messages, readImage)).map((m) => {
+        if (m.role === "user" && typeof m.content !== "string") {
+          return { role: "user", content: m.content.map(toOpenAIPart) };
+        }
+        // taugraph's own fields (`model`, `reasoning`, `toolCalls`) are not OpenAI's; strict endpoints refuse them
+        if (m.role === "system" || m.role === "assistant") return { role: m.role, content: m.content };
+        return m;
+      });
       const response = await fetch(url, {
         method: "POST",
         signal,
@@ -128,21 +141,37 @@ export function openAICompatibleModel(options: OpenAICompatibleOptions): LLMMode
           temperature: request.temperature,
           max_tokens: request.maxTokens,
           ...(request.responseFormat === "json" && { response_format: { type: "json_object" } }),
+          ...(request.reasoning && (options.reasoningParams ?? defaultReasoningParams)(request.reasoning)),
         }),
       });
       if (!response.ok)
         throw new Error(`${url} responded ${response.status}: ${(await response.text()).slice(0, 300)}`);
       const body = (await response.json()) as {
         model?: string;
-        choices?: { message?: { content?: string | null }; finish_reason?: string }[];
-        usage?: { prompt_tokens?: number; completion_tokens?: number };
+        choices?: {
+          message?: { content?: string | null; reasoning_content?: string | null; reasoning?: string | null };
+          finish_reason?: string;
+        }[];
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          completion_tokens_details?: { reasoning_tokens?: number };
+        };
       };
       const choice = body.choices?.[0];
+      const message = choice?.message;
+      const thought = message?.reasoning_content || message?.reasoning;
+      const reasoningTokens = body.usage?.completion_tokens_details?.reasoning_tokens;
       return {
-        content: choice?.message?.content ?? "",
+        content: message?.content ?? "",
         ...(body.model && { model: body.model }),
         ...(choice?.finish_reason && { finishReason: choice.finish_reason }),
-        usage: { inputTokens: body.usage?.prompt_tokens ?? 0, outputTokens: body.usage?.completion_tokens ?? 0 },
+        usage: {
+          inputTokens: body.usage?.prompt_tokens ?? 0,
+          outputTokens: body.usage?.completion_tokens ?? 0,
+          ...(reasoningTokens !== undefined && { reasoningTokens }),
+        },
+        ...(thought && { reasoning: [{ text: thought }] }),
       };
     },
   };
