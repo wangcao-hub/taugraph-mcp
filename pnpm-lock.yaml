@@ -15,8 +15,8 @@ importers:
         specifier: ^2
         version: 2.7.0
       taugraph:
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.0
+        version: 0.3.0
       zod:
         specifier: ^4
         version: 4.6.7
@@ -740,8 +740,8 @@ packages:
   std-env@4.3.0:
     resolution: {integrity: sha512-OtU/EgQ1kIm5KwqQpBC6ZEMXrZRui11w8zgfTWp8cdO9B8OaPsbA8bTHO2P+HNo1VlUTGMVBwPhydu6poeXiag==}
 
-  taugraph@0.2.0:
-    resolution: {integrity: sha512-t3AFsbVH/00TvzcAwwuZQvtnH3HEmq9z++RF7BLLbVvBi1xgyt/e//br7KO/EsoHKFvIlzRM5iOPdhQe4fPW2A==}
+  taugraph@0.3.0:
+    resolution: {integrity: sha512-thGpXXEpUHw2Xx1Xz61O440FrL4zBLClfzm4Bi8fqMooVepGc5ehq/a4NqqABAsMRkghpmgLXzTst1ge6XrIRQ==}
     engines: {node: '>=22'}
 
   tinybench@6.2.4:
@@ -1541,7 +1541,7 @@ snapshots:
 
   std-env@4.3.0: {}
 
-  taugraph@0.2.0: {}
+  taugraph@0.3.0: {}
 
   tinybench@6.2.4: {}
 
