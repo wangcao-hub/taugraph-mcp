@@ -1,6 +1,6 @@
 {
   "name": "taugraph-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Serve taugraph flows as MCP tools: deterministic multi-step flows with pauses, typed state and replayable traces for any MCP client (Claude, Cursor, Kiro, AgentScope Java, ...).",
   "keywords": [
     "mcp",
