@@ -125,6 +125,8 @@ If neither is available, the LLM step fails with a message that says how to conf
 
 The env model sends a request's `reasoning` level as `reasoning_effort` as it is (`"off"` as `"none"`). `reasoningParams`, which maps levels to other request parameters, is only available when you build `openAICompatibleModel` yourself. `samplingModel` ignores `reasoning`, because MCP sampling has no such field.
 
+Tool calling works with both models. `samplingModel` needs a client that declares `sampling.tools` (MCP 2025-11-25) and refuses tools otherwise; a `toolChoice` of one tool is sent as that tool alone, required. `openAICompatibleModel` is `taugraph/openai`'s adapter, so it takes all of that adapter's options.
+
 ## Runs and safety
 
 - `--store <dir>` (default `./.taugraph/runs`) keeps one append-only JSONL trace per run, `<dir>/<flow>/<runId>.jsonl`. Each event is written before the run takes its next step, so a paused run survives a server restart, and traces work with taugraph's `replay` and `diffTraces`. `--memory` keeps nothing on disk.

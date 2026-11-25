@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Images: `samplingModel` sends user messages with text and image parts as MCP content blocks, and `openAICompatibleModel` sends them in OpenAI's format. Both take `resolveImage` to read image references. A message with one part is sent as one block; several blocks in one message need a client on MCP 2025-11-25 or later. Requires taugraph 0.3.0.
 - Reasoning: `openAICompatibleModel` sends `reasoning_effort` (or `reasoningParams`) for `request.reasoning`, reads `reasoning_content` and `reasoning` into `response.reasoning`, and no longer sends taugraph's own message fields. `samplingModel` ignores `reasoning`, which MCP sampling has no field for. Requires taugraph 0.3.0.
+- Tool calling: `samplingModel` sends tools and tool choice through MCP sampling (clients that declare `sampling.tools`, MCP 2025-11-25), tool calls as `tool_use` blocks and tool results as `tool_result` blocks, and reads `tool_use` replies into `toolCalls`, so `taugraph/agent` runs on MCP sampling. `openAICompatibleModel` now forwards to `taugraph/openai`, with its tools, images and reasoning. Requires taugraph 0.3.0.
 
 ## [0.1.0] - 2026-11-19
 

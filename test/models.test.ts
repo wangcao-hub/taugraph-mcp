@@ -1,4 +1,8 @@
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CreateMessageRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { createAgent, tool } from "taugraph/agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openAICompatibleModel, samplingModel } from "../src/models.js";
 
@@ -21,6 +25,36 @@ function samplingServer(seen: { params?: { messages?: unknown[] } } = {}): Serve
     },
   } as unknown as Server;
 }
+
+type Params = Record<string, unknown> & { messages?: unknown[] };
+
+/** A fake server whose client may or may not support tools in sampling. */
+function toolServer(replies: unknown[], seen: Params[] = [], tools = true): Server {
+  return {
+    getClientCapabilities: () => ({ sampling: tools ? { tools: {} } : {} }),
+    createMessage: async (params: Params) => {
+      seen.push(params);
+      return replies.shift();
+    },
+  } as unknown as Server;
+}
+
+/** A real MCP server and client over an in-memory transport; the client answers sampling with the given replies. */
+async function samplingPair(replies: unknown[], seen: Params[]): Promise<Server> {
+  const server = new Server({ name: "test", version: "0.0.0" }, { capabilities: {} });
+  const client = new Client({ name: "client", version: "0.0.0" }, { capabilities: { sampling: { tools: {} } } });
+  client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+    seen.push(request.params as Params);
+    return replies.shift() as never;
+  });
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await Promise.all([client.connect(clientSide), server.connect(serverSide)]);
+  return server;
+}
+
+const weatherSpec = { name: "weather", inputSchema: { type: "object", properties: { city: { type: "string" } } } };
+const weather = tool({ ...weatherSpec, run: (args) => `${String(args.city)}: 晴` });
+const text = (t: string) => ({ role: "assistant", model: "m", content: { type: "text", text: t } });
 
 describe("samplingModel", () => {
   it("sends text and images as MCP content blocks", async () => {
@@ -86,9 +120,165 @@ describe("samplingModel", () => {
     expect(reply.content).toBe("a cat");
     expect(seen.params).not.toHaveProperty("reasoning");
   });
+
+  it("needs a client that supports tools in sampling when the flow uses tools", async () => {
+    const plain = samplingModel(toolServer([], [], false));
+    await expect(
+      plain.complete({ messages: [{ role: "user", content: "q" }], tools: [weatherSpec] }, { signal }),
+    ).rejects.toThrow("This flow uses tools, but the MCP client does not support tools in sampling (sampling.tools).");
+    const seen: Params[] = [];
+    const reply = await samplingModel(toolServer([text("hi")], seen, false)).complete(
+      { messages: [{ role: "user", content: "q" }] },
+      { signal },
+    );
+    expect(reply.content).toBe("hi");
+    expect(seen[0]).not.toHaveProperty("tools");
+  });
+
+  it("passes tools and maps tool choices to MCP modes", async () => {
+    const seen: Params[] = [];
+    const model = samplingModel(toolServer([text("a"), text("b"), text("c"), text("d")], seen));
+    const other = { name: "clock", inputSchema: { type: "object" } };
+    const ask = (toolChoice: unknown) =>
+      model.complete({ messages: [{ role: "user", content: "q" }], tools: [weatherSpec, other], toolChoice } as never, {
+        signal,
+      });
+    await ask("auto");
+    await ask("required");
+    await ask("none");
+    await ask({ name: "clock" });
+    expect(seen.map((p) => p.toolChoice)).toEqual([
+      { mode: "auto" },
+      { mode: "required" },
+      { mode: "none" },
+      { mode: "required" },
+    ]);
+    expect(seen[0]?.tools).toEqual([weatherSpec, other]);
+    expect(seen[3]?.tools).toEqual([other]);
+    await expect(ask({ name: "zzz" })).rejects.toThrow(
+      'toolChoice names "zzz", which is not one of the request\'s tools',
+    );
+  });
+
+  it("sends tool calls as tool_use blocks and consecutive results as one message of tool_result blocks", async () => {
+    const seen: Params[] = [];
+    const reply = await samplingModel(
+      toolServer(
+        [
+          {
+            role: "assistant",
+            model: "m",
+            stopReason: "toolUse",
+            content: [
+              { type: "text", text: "checking" },
+              { type: "tool_use", id: "c3", name: "weather", input: { city: "北京" } },
+            ],
+          },
+        ],
+        seen,
+      ),
+    ).complete(
+      {
+        messages: [
+          { role: "user", content: "q" },
+          {
+            role: "assistant",
+            content: "two cities",
+            toolCalls: [
+              { id: "c1", name: "weather", arguments: { city: "南京" } },
+              { id: "c2", name: "weather", arguments: { city: "上海" } },
+            ],
+          },
+          { role: "tool", toolCallId: "c1", content: "晴" },
+          { role: "tool", toolCallId: "c2", content: [{ type: "text", text: "down" }], isError: true },
+        ],
+        tools: [weatherSpec],
+      },
+      { signal },
+    );
+    expect(seen[0]?.messages).toEqual([
+      { role: "user", content: { type: "text", text: "q" } },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "two cities" },
+          { type: "tool_use", id: "c1", name: "weather", input: { city: "南京" } },
+          { type: "tool_use", id: "c2", name: "weather", input: { city: "上海" } },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", toolUseId: "c1", content: [{ type: "text", text: "晴" }] },
+          { type: "tool_result", toolUseId: "c2", content: [{ type: "text", text: "down" }], isError: true },
+        ],
+      },
+    ]);
+    expect(reply).toEqual({
+      content: "checking",
+      model: "m",
+      finishReason: "toolUse",
+      toolCalls: [{ id: "c3", name: "weather", arguments: { city: "北京" } }],
+    });
+  });
+
+  it("runs a tool loop with createAgent through a real MCP client", async () => {
+    const seen: Params[] = [];
+    const server = await samplingPair(
+      [
+        {
+          role: "assistant",
+          model: "m",
+          stopReason: "toolUse",
+          content: [{ type: "tool_use", id: "c1", name: "weather", input: { city: "南京" } }],
+        },
+        { role: "assistant", model: "m", stopReason: "endTurn", content: { type: "text", text: "南京晴" } },
+      ],
+      seen,
+    );
+    const { state } = await createAgent({ model: samplingModel(server), tools: [weather] }).run({
+      messages: [{ role: "user", content: "南京天气" }],
+    });
+    expect(state.final).toBe("南京晴");
+    expect(seen[0]?.tools).toEqual([weatherSpec]);
+    expect(seen[1]?.messages).toEqual([
+      { role: "user", content: { type: "text", text: "南京天气" } },
+      { role: "assistant", content: { type: "tool_use", id: "c1", name: "weather", input: { city: "南京" } } },
+      {
+        role: "user",
+        content: { type: "tool_result", toolUseId: "c1", content: [{ type: "text", text: "南京: 晴" }] },
+      },
+    ]);
+  });
 });
 
 describe("openAICompatibleModel", () => {
+  it("calls tools through taugraph/openai", async () => {
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [{ id: "c1", type: "function", function: { name: "weather", arguments: '{"city":"南京"}' } }],
+            },
+          },
+        ],
+      });
+    });
+    const reply = await openAICompatibleModel({ baseURL: "http://x/v1", model: "m" }).complete(
+      { messages: [{ role: "user", content: "q" }], tools: [weatherSpec], toolChoice: "required" },
+      { signal },
+    );
+    expect(body.tools).toEqual([
+      { type: "function", function: { name: "weather", parameters: weatherSpec.inputSchema } },
+    ]);
+    expect(body.tool_choice).toBe("required");
+    expect(reply.toolCalls).toEqual([{ id: "c1", name: "weather", arguments: { city: "南京" } }]);
+  });
+
   it("sends images in OpenAI's format", async () => {
     let body: { messages?: unknown[] } = {};
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {

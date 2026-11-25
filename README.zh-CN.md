@@ -78,6 +78,8 @@ LLM 节点拿到的 `env.model` 按以下顺序确定：
 
 用环境变量配置的模型把请求的 `reasoning` 档位原样作为 `reasoning_effort` 发出（`"off"` 写成 `"none"`）。`reasoningParams` 可以把档位换成别的请求参数，但只有自己构建 `openAICompatibleModel` 时才能用。`samplingModel` 忽略 `reasoning`，因为 MCP sampling 没有这个字段。
 
+两种模型都支持工具调用。`samplingModel` 要求客户端声明 `sampling.tools`（MCP 2025-11-25），否则遇到工具会报错；指定单个工具的 `toolChoice` 会变成只发送这一个工具并要求调用。`openAICompatibleModel` 就是 `taugraph/openai` 的适配器，接受它的全部选项。
+
 ## 运行记录与安全
 
 - `--store <dir>`（默认 `./.taugraph/runs`）为每次运行保存一份只追加的 JSONL trace：`<dir>/<flow>/<runId>.jsonl`。每个事件都在运行进入下一步之前写入，所以服务重启后暂停的运行还在，trace 也能直接用于 taugraph 的 `replay` 和 `diffTraces`。`--memory` 表示不落盘。
