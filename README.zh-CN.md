@@ -12,7 +12,7 @@ npx -y taugraph-mcp ./flows
 
 ## 写一个流程
 
-流程文件默认导出 `defineFlow({...})`。文件里可以直接 import `taugraph`、`taugraph/nodes`、`taugraph/agent`、`taugraph/openai`、`taugraph-mcp` 和 `zod`，不用另外安装，服务端会提供自己的那一份。完整示例见 [English README](./README.md#write-a-flow) 和 [`examples/flows`](./examples/flows)。LLM 步骤把 `env.model` 传给 `LLMNode` 即可。
+流程文件默认导出 `defineFlow({...})`。文件里可以直接 import `taugraph`、`taugraph/nodes`、`taugraph/agent`、`taugraph/openai`、`taugraph/file`、`taugraph-mcp` 和 `zod`，不用另外安装，服务端会提供自己的那一份。完整示例见 [English README](./README.md#write-a-flow) 和 [`examples/flows`](./examples/flows)。LLM 步骤把 `env.model` 传给 `LLMNode` 即可。
 
 ## 工具
 

@@ -14,7 +14,7 @@ npx -y taugraph-mcp ./flows
 
 ## Write a flow
 
-A flow file default-exports `defineFlow({...})`. It can import `taugraph`, `taugraph/nodes`, `taugraph/agent`, `taugraph/openai`, `taugraph-mcp` and `zod` without installing them; the server provides its own copies.
+A flow file default-exports `defineFlow({...})`. It can import `taugraph`, `taugraph/nodes`, `taugraph/agent`, `taugraph/openai`, `taugraph/file`, `taugraph-mcp` and `zod` without installing them; the server provides its own copies.
 
 ```ts
 // flows/deploy.ts

@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - `fileStore` now stores runs through `taugraph/file`: trace format v2 (much smaller files), a half-written last line after a crash no longer breaks loading or resuming, a lock file per run, and fsync around write steps. Existing v1 files are still read.
+- Stored runs are in trace format v2, which needs taugraph 0.4 or later to read, so taugraph-mcp 0.2 cannot read runs written by this version.
+
+### Added
+
+- Flow files loaded by the CLI can import `taugraph/file`.
 
 ## [0.2.0] - 2026-11-25
 
