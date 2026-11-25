@@ -169,7 +169,7 @@ export function openAICompatibleModel(options: OpenAICompatibleOptions): LLMMode
         usage: {
           inputTokens: body.usage?.prompt_tokens ?? 0,
           outputTokens: body.usage?.completion_tokens ?? 0,
-          ...(reasoningTokens !== undefined && { reasoningTokens }),
+          ...(typeof reasoningTokens === "number" && { reasoningTokens }),
         },
         ...(thought && { reasoning: [{ text: thought }] }),
       };

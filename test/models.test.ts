@@ -159,4 +159,32 @@ describe("openAICompatibleModel", () => {
     expect(body).not.toHaveProperty("reasoning_effort");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
   });
+
+  it("sends no reasoning setting when the request has no level", async () => {
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return Response.json({ choices: [{ message: { content: "ok" } }] });
+    });
+    await openAICompatibleModel({ baseURL: "http://x/v1", model: "m" }).complete(
+      { messages: [{ role: "user", content: "q" }] },
+      { signal },
+    );
+    expect(body).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("leaves reasoningTokens out when the provider does not count them", async () => {
+    const replies = [
+      { prompt_tokens: 1, completion_tokens: 2, completion_tokens_details: { reasoning_tokens: null } },
+      { prompt_tokens: 1, completion_tokens: 2 },
+    ];
+    for (const usage of replies) {
+      vi.stubGlobal("fetch", async () => Response.json({ choices: [{ message: { content: "ok" } }], usage }));
+      const reply = await openAICompatibleModel({ baseURL: "http://x/v1", model: "m" }).complete(
+        { messages: [{ role: "user", content: "q" }] },
+        { signal },
+      );
+      expect(reply.usage).toStrictEqual({ inputTokens: 1, outputTokens: 2 });
+    }
+  });
 });

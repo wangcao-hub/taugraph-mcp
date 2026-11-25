@@ -123,6 +123,8 @@ LLM nodes get `env.model`, which is, in order:
 
 If neither is available, the LLM step fails with a message that says how to configure one.
 
+The env model sends a request's `reasoning` level as `reasoning_effort` as it is (`"off"` as `"none"`). `reasoningParams`, which maps levels to other request parameters, is only available when you build `openAICompatibleModel` yourself. `samplingModel` ignores `reasoning`, because MCP sampling has no such field.
+
 ## Runs and safety
 
 - `--store <dir>` (default `./.taugraph/runs`) keeps one append-only JSONL trace per run, `<dir>/<flow>/<runId>.jsonl`. Each event is written before the run takes its next step, so a paused run survives a server restart, and traces work with taugraph's `replay` and `diffTraces`. `--memory` keeps nothing on disk.
