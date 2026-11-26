@@ -4,8 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-26
+
+Runs are stored through `taugraph/file`: smaller files in trace format v2, crash-safe, and locked per run.
+
 ### Changed
 
+- Depends on taugraph `^0.4.0`. Flows get its retry rules: retries wait between attempts, 4xx errors other than 408, 409, 425 and 429 are no longer retried, and a `write` node with `retry` must set `retry.idempotent: true`. `openAICompatibleModel` throws taugraph's `HTTPError` for responses outside 2xx. See the [taugraph 0.4.0 changelog](https://github.com/wangcao-hub/taugraph/blob/main/CHANGELOG.md#040---2026-11-26).
 - `fileStore` now stores runs through `taugraph/file`: trace format v2 (much smaller files), a half-written last line after a crash no longer breaks loading or resuming, a lock file per run, and fsync around write steps. Existing v1 files are still read.
 - Stored runs are in trace format v2, which needs taugraph 0.4 or later to read, so taugraph-mcp 0.2 cannot read runs written by this version.
 
@@ -40,6 +45,7 @@ Tool calling through MCP sampling, images and reasoning, and `openAICompatibleMo
 - Library API: `defineFlow`, `createFlowServer`, `serveHttp`, `loadFlows`, `fileStore`, `memoryStore`, `samplingModel`, `openAICompatibleModel`.
 - Example flows and an AgentScope Java 2.0.5 client example, checked in CI.
 
-[Unreleased]: https://github.com/wangcao-hub/taugraph-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/wangcao-hub/taugraph-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/wangcao-hub/taugraph-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/wangcao-hub/taugraph-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/wangcao-hub/taugraph-mcp/releases/tag/v0.1.0
